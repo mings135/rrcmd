@@ -19,8 +19,9 @@ jobs:
         go-version: '1.23.4'
 
     - name: Build
+      id: myval
       run: |
-        go build -o ./ -v ./... &&
+        go build -v ./... &&
         echo "release_status=ok" >> $GITHUB_OUTPUT
 
     - name: Upload
