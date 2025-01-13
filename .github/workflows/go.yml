@@ -4,7 +4,16 @@
 name: Go
 
 on:
+  push:
+    tags:
+      - v*
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag version you want to build"
+        required: true
+        type: string
+        default: "v0.1"
  
 jobs:
 
@@ -21,16 +30,37 @@ jobs:
     - name: Build
       id: myval
       run: |
+        if [ "${{ github.event.inputs.tag }}" ]; then
+          tmp_tag="${{ github.event.inputs.tag }}"
+        else
+          tmp_tag="${{ github.ref_name }}"
+        fi
         go build -v ./... &&
-        echo "release_status=ok" >> $GITHUB_OUTPUT
+        echo "release_status=ok" >> $GITHUB_OUTPUT &&
+        echo "release_tag=${tmp_tag}" >> $GITHUB_OUTPUT
 
-    - name: Upload
+    - name: Release
       uses: softprops/action-gh-release@v2
       if: "steps.myval.outputs.release_status == 'ok' && !cancelled()"
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
-        name: "rrcmd"
-        tag_name: "latest"
+        name: "${{ steps.myval.outputs.release_tag }}"
         body: "远程执行命令, 多主机并发"
         files: rrcmd
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ secrets.MY_TOKEN }}
+        retain_days: 1
+        keep_minimum_runs: 3
+
+    - name: Delete older Releases
+      uses: dev-drprasad/delete-older-releases@v0.3.4
+      if: "!cancelled()"
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+      with:
+        keep_latest: 3
+        delete_tags: true
