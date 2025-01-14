@@ -11,7 +11,7 @@ on:
 env:
   APP_NAME: rrcmd
   BUILD_DIR: build
-  BUILD_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ github.ref_name }}
 
 jobs:
 
@@ -50,8 +50,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
-        name: ${{ env.BUILD_TAG }}
-        # tag_name: ${{ env.BUILD_TAG }}
+        name: ${{ env.RELEASE_TAG }}
+        # tag_name: ${{ env.RELEASE_TAG }}
         body: "远程执行命令, 多主机并发"
         files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
 

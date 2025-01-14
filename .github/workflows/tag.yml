@@ -12,6 +12,9 @@ on:
           type: string
           default: "v0.1"
 
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag_name }}
+
 jobs:
 
   build:
@@ -21,10 +24,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     
-    - name: Push
-      run: |
-        set -e
-        git config --global user.name "${{ secrets.USER_NAME }}"
-        git config --global user.email "${{ secrets.USER_EMAIL }}"
-        git tag ${{ github.event.inputs.tag_name }}
-        git push https://${{ secrets.MY_USER }}:${{ secrets.MY_TOKEN }}@github.com/mings135/rrcmd.git ${{ github.event.inputs.tag_name }}
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+      with:
+        name: ${{ env.RELEASE_TAG }}
+        tag_name: ${{ env.RELEASE_TAG }}
+        body: "远程执行命令, 多主机并发"
