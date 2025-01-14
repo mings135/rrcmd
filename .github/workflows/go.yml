@@ -19,15 +19,27 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: [1.23.4]
+        os: [linux]
+        arch: [amd64, arm64]
+
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.4'
+        go-version: ${{ matrix.go-version }}
 
     - name: Build
+      run: |
+        mkdir -p build
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o build/rrcmd_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+        
+    - name: Info
       id: myval
       run: |
         if [ "${{ github.event.inputs.tag }}" ]; then
@@ -35,10 +47,9 @@ jobs:
         else
           tmp_tag="${{ github.ref_name }}"
         fi
-        go build -v ./... &&
-        echo "release_status=ok" >> $GITHUB_OUTPUT &&
         echo "release_tag=${tmp_tag}" >> $GITHUB_OUTPUT
-
+        echo "release_status=ok" >> $GITHUB_OUTPUT
+  
     - name: Release
       uses: softprops/action-gh-release@v2
       if: "steps.myval.outputs.release_status == 'ok' && !cancelled()"
@@ -48,7 +59,7 @@ jobs:
         name: "${{ steps.myval.outputs.release_tag }}"
         tag_name: "${{ steps.myval.outputs.release_tag }}"
         body: "远程执行命令, 多主机并发"
-        files: rrcmd
+        files: build/*
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
