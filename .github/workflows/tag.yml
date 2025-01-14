@@ -24,5 +24,6 @@ jobs:
     - name: Push
       run: |
         set -e
-        git tag -v ${{ github.event.inputs.tag }}
+        git tag ${{ github.event.inputs.tag }}
+        git tag
         git push --tags
