@@ -64,7 +64,7 @@ jobs:
       uses: Mattraks/delete-workflow-runs@v2
       with:
         token: ${{ secrets.MY_TOKEN }}
-        retain_days: 0
+        retain_days: 1
         keep_minimum_runs: 3
 
     - name: Delete Release
@@ -72,5 +72,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
-        keep_latest: 3
+        keep_latest: 9
         delete_tags: true
