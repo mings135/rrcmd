@@ -44,6 +44,7 @@ jobs:
       run: |
         mkdir -p ${{ env.BUILD_DIR }}
         GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+        exit 1
   
     - name: Release
       uses: softprops/action-gh-release@v2
