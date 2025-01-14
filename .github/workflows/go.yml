@@ -7,19 +7,11 @@ on:
   push:
     tags:
       - v*
-  # workflow_dispatch:
-  #   inputs:
-  #     tag:
-  #       description: "The tag version you want to build"
-  #       required: true
-  #       type: string
-  #       default: "v0.1"
 
 env:
   APP_NAME: rrcmd
   BUILD_DIR: build
   BUILD_TAG: ${{ github.ref_name }}
-  # BUILD_TAG: ${{ github.event.inputs.tag }}
 
 jobs:
 
@@ -43,7 +35,6 @@ jobs:
 
     - name: Build
       run: |
-        exit 1
         mkdir -p ${{ env.BUILD_DIR }}
         GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
 
@@ -60,7 +51,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
         name: ${{ env.BUILD_TAG }}
-        tag_name: ${{ env.BUILD_TAG }}
+        # tag_name: ${{ env.BUILD_TAG }}
         body: "远程执行命令, 多主机并发"
         files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
 
@@ -71,7 +62,6 @@ jobs:
     steps:
     - name: Delete workflow
       uses: Mattraks/delete-workflow-runs@v2
-      if: always()
       with:
         token: ${{ secrets.MY_TOKEN }}
         retain_days: 1
