@@ -4,9 +4,9 @@
 name: Go
 
 on:
-  push:
-    tags:
-      - v*
+  # push:
+  #   tags:
+  #     - v*
   workflow_dispatch:
     inputs:
       tag:
@@ -14,7 +14,11 @@ on:
         required: true
         type: string
         default: "v0.1"
- 
+
+env:
+  APP_NAME: rrmcd
+  BUILD_DIR: build
+
 jobs:
 
   build:
@@ -36,9 +40,9 @@ jobs:
 
     - name: Build
       run: |
-        mkdir -p build
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o build/rrcmd_${{ matrix.os }}_${{ matrix.arch }} -v ./...
-        
+        mkdir -p ${{ env.BUILD_DIR }}
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+
     - name: Info
       id: myval
       run: |
@@ -48,18 +52,18 @@ jobs:
           tmp_tag="${{ github.ref_name }}"
         fi
         echo "release_tag=${tmp_tag}" >> $GITHUB_OUTPUT
-        echo "release_status=ok" >> $GITHUB_OUTPUT
+        echo "release_${{ matrix.arch }}=ok" >> $GITHUB_OUTPUT
   
     - name: Release
       uses: softprops/action-gh-release@v2
-      if: "steps.myval.outputs.release_status == 'ok' && !cancelled()"
+      if: "steps.myval.outputs.release_amd64 == 'ok' && steps.myval.outputs.release_arm64 == 'ok' && !cancelled()"
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
         name: "${{ steps.myval.outputs.release_tag }}"
         tag_name: "${{ steps.myval.outputs.release_tag }}"
         body: "远程执行命令, 多主机并发"
-        files: build/*
+        files: ${{ env.BUILD_DIR }}/*
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
