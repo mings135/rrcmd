@@ -1,13 +1,13 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go Push Tag
+name: Manual Create Release
 
 on:
   workflow_dispatch:
     inputs:
         tag_name:
-          description: "The tag version you want to push"
+          description: "The tag version you want to create"
           required: true
           type: string
           default: "v0.1"
