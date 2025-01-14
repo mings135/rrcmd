@@ -10,13 +10,14 @@ import (
 
 // Color constants
 const (
-	Red      = "\033[31m"
-	Green    = "\033[32m"
-	Yellow   = "\033[33m"
-	Blue     = "\033[34m"
-	Purple   = "\033[35m"
-	Cyan     = "\033[36m"
-	ColorEnd = "\033[0m"
+	Red       = "\033[31m"
+	Green     = "\033[32m"
+	Yellow    = "\033[33m"
+	Blue      = "\033[34m"
+	Purple    = "\033[35m"
+	Cyan      = "\033[36m"
+	ColorOff  = "\033[0m"
+	HighLight = "\033[1m"
 )
 
 // Colorize function to return colored string
@@ -38,7 +39,7 @@ func Colorize(colorID int, input string) string {
 	default:
 		return input
 	}
-	return color + input + ColorEnd
+	return color + input + ColorOff
 }
 
 // RunCommand struct to hold command information
@@ -124,8 +125,8 @@ func main() {
 	username := os.Args[1]
 	command := os.Args[2]
 	hosts := os.Args[3:]
-	fmt.Printf("%vRun command%v: %v\n", Blue, ColorEnd, command)
-	fmt.Printf("%vRemote host%v: %v\n", Blue, ColorEnd, hosts)
+	fmt.Printf("%v%vRun command%v: %v\n", Blue, HighLight, ColorOff, command)
+	fmt.Printf("%v%vRemote host%v: %v\n", Blue, HighLight, ColorOff, hosts)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
