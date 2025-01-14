@@ -18,6 +18,8 @@ on:
 env:
   APP_NAME: rrmcd
   BUILD_DIR: build
+  # BUILD_TAG: ${{ github.ref_name }}
+  BUILD_TAG: ${{ github.event.inputs.tag }}
 
 jobs:
 
@@ -46,22 +48,17 @@ jobs:
     - name: Info
       id: myval
       run: |
-        if [ "${{ github.event.inputs.tag }}" ]; then
-          tmp_tag="${{ github.event.inputs.tag }}"
-        else
-          tmp_tag="${{ github.ref_name }}"
-        fi
-        echo "release_tag=${tmp_tag}" >> $GITHUB_OUTPUT
-        echo "release_${{ matrix.arch }}=ok" >> $GITHUB_OUTPUT
+        echo "release_status=ok" >> $GITHUB_OUTPUT
+        exit 1
   
     - name: Release
       uses: softprops/action-gh-release@v2
-      if: "steps.myval.outputs.release_amd64 == 'ok' && steps.myval.outputs.release_arm64 == 'ok' && !cancelled()"
+      # if: "steps.myval.outputs.release_status == 'ok' && !cancelled()"
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
       with:
-        name: "${{ steps.myval.outputs.release_tag }}"
-        tag_name: "${{ steps.myval.outputs.release_tag }}"
+        name: ${{ env.BUILD_TAG }}
+        tag_name: ${{ env.BUILD_TAG }}
         body: "远程执行命令, 多主机并发"
         files: ${{ env.BUILD_DIR }}/*
 
