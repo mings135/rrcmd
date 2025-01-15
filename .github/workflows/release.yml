@@ -14,7 +14,6 @@ env:
   RELEASE_TAG: ${{ github.ref_name }}
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
 
@@ -25,52 +24,52 @@ jobs:
         arch: [amd64, arm64]
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Golang
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    - name: Build
-      run: |
-        mkdir -p ${{ env.BUILD_DIR }}
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+      - name: Build
+        run: |
+          mkdir -p ${{ env.BUILD_DIR }}
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
 
-    - name: Check
-      run: |
-        if [ ! -f ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} ]; then
-          echo "Build failed or output file not found!"
-          exit 1
-        fi
+      - name: Check
+        run: |
+          if [ ! -f ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} ]; then
+            echo "Build failed or output file not found!"
+            exit 1
+          fi
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
-      with:
-        name: ${{ env.RELEASE_TAG }}
-        # tag_name: ${{ env.RELEASE_TAG }}
-        body: "远程执行命令, 多主机并发"
-        files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+        with:
+          name: ${{ env.RELEASE_TAG }}
+          # tag_name: ${{ env.RELEASE_TAG }}
+          body: "远程执行命令, 多主机并发"
+          files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
 
   clean:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-    - name: Delete workflow
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        token: ${{ secrets.MY_TOKEN }}
-        retain_days: 1
-        keep_minimum_runs: 3
+      - name: Delete workflow
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.MY_TOKEN }}
+          retain_days: 1
+          keep_minimum_runs: 3
 
-    - name: Delete Release
-      uses: dev-drprasad/delete-older-releases@v0.3.4
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
-      with:
-        keep_latest: 9
-        delete_tags: true
+      - name: Delete Release
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+        with:
+          keep_latest: 9
+          delete_tags: true
