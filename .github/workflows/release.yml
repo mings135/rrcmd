@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -58,6 +58,9 @@ jobs:
     needs: build
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Delete workflow
         uses: Mattraks/delete-workflow-runs@v2.1.0
         with:
@@ -68,14 +71,26 @@ jobs:
       - name: Delete older releases
         env:
           GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+        shell: bash
         run: |
-          # 获取要删除的列表并存入变量
-          TARGETS=$(gh release list --limit 100 | tail -n +4 | awk '{print $1}')
+          echo "--- 正在清理旧的 Release 和 Tag ---"
+          # 获取列表并存入变量
+          gh release list --limit 100
+          RELEASES=$(gh release list --limit 100 | grep -v "latest" | tail -n +2 | awk '{print $1}')
           
-          if [ -z "$TARGETS" ]; then
-            echo "没有需要删除的旧版本。"
+          if [ -n "$RELEASES" ]; then
+            # -r: 为空不执行 | -I %: 定义占位符 | -n 1: 每次处理一个
+            echo "$RELEASES" | xargs -r -I % -n 1 gh release delete % --yes --cleanup-tag
           else
-            echo "正在删除以下版本: $TARGETS"
-            echo "$TARGETS" | xargs -I % gh release delete % --yes --cleanup-tag
+            echo "没有需要删除的 Release"
           fi
-        
+
+          echo "--- 正在清理旧的 Workflow 运行记录 ---"
+          gh run list --limit 100 --status completed
+          RUN_IDS=$(gh run list --limit 100 --status completed | tail -n +2 | awk '{print $7}')
+          
+          if [ -n "$RUN_IDS" ]; then
+            echo "$RUN_IDS" | xargs -r -I % -n 1 gh run delete %
+          else
+            echo "没有需要删除的运行记录"
+          fi
