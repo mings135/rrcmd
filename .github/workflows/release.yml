@@ -88,8 +88,8 @@ jobs:
             | tail -n +"$REL_SKIP") 
           
           if [ -n "$RELEASES" ]; then
-            echo "发现待删除 Release: 
-              $RELEASES"
+            echo "发现待删除 Release:
+          $RELEASES"
             echo "$RELEASES" | xargs -r -I % -n 1 gh release delete % --yes --cleanup-tag
           else
             echo "✅ 没有需要删除的 Release"
@@ -102,7 +102,7 @@ jobs:
           
           if [ -n "$RUN_IDS" ]; then
             echo "发现待删除运行记录 ID: 
-              $RUN_IDS"
+          $RUN_IDS"
             echo "$RUN_IDS" | xargs -r -I % -n 1 gh run delete %
           else
             echo "✅ 没有需要删除的运行记录"
