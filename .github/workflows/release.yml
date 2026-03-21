@@ -44,14 +44,33 @@ jobs:
             exit 1
           fi
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2.6.1
-        with:
-          name: ${{ env.RELEASE_TAG }}
-          # tag_name: ${{ env.RELEASE_TAG }}
-          body: "远程执行命令, 多主机并发"
-          token: ${{ secrets.MY_TOKEN }}
-          files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v2.6.1
+      #   with:
+      #     name: ${{ env.RELEASE_TAG }}
+      #     # tag_name: ${{ env.RELEASE_TAG }}
+      #     body: "远程执行命令, 多主机并发"
+      #     token: ${{ secrets.MY_TOKEN }}
+      #     files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
+
+      - name: Create or Update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          RELEASE_FILE: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
+        run: |
+          echo "--- 正在处理 Release $RELEASE_TAG ---"
+          
+          # 检查 Release 是否已经存在
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release 已存在，正在上传新文件..."
+            gh release upload "$RELEASE_TAG" "$RELEASE_FILE" --clobber
+          else
+            echo "创建新 Release 并上传文件..."
+            gh release create "$RELEASE_TAG" "$RELEASE_FILE" \
+              --title "$RELEASE_TAG" \
+              --notes "远程执行命令, 多主机并发"
+          fi
 
   clean:
     runs-on: ubuntu-latest
@@ -61,36 +80,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Delete workflow
-        uses: Mattraks/delete-workflow-runs@v2.1.0
-        with:
-          token: ${{ secrets.MY_TOKEN }}
-          retain_days: 1
-          keep_minimum_runs: 3
-
-      - name: Delete older releases
+      - name: Clean releases and workflows
         env:
           GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
         shell: bash
         run: |
           echo "--- 正在清理旧的 Release 和 Tag ---"
-          # 获取列表并存入变量
-          gh release list --limit 100
-          RELEASES=$(gh release list --limit 100 | grep -v "latest" | tail -n +2 | awk '{print $1}')
+          # 使用 --json 确保 Tag 100% 准确，保留最新的几个(排除 latest)
+          RELEASES=$(gh release list --limit 100 --json tagName,isLatest \
+            | jq -r '.[] | select(.isLatest == false) | .tagName' \
+            | tail -n +3) 
           
           if [ -n "$RELEASES" ]; then
-            # -r: 为空不执行 | -I %: 定义占位符 | -n 1: 每次处理一个
+            echo "发现待删除 Release: $RELEASES"
             echo "$RELEASES" | xargs -r -I % -n 1 gh release delete % --yes --cleanup-tag
           else
-            echo "没有需要删除的 Release"
+            echo "✅ 没有需要删除的 Release"
           fi
 
           echo "--- 正在清理旧的 Workflow 运行记录 ---"
-          gh run list --limit 100 --status completed
-          RUN_IDS=$(gh run list --limit 100 --status completed | tail -n +2 | awk '{print $7}')
+          # 使用 --json 提取 run ID
+          RUN_IDS=$(gh run list --limit 100 --status completed --json databaseId \
+            | jq -r '.[].databaseId' \
+            | tail -n +6)
           
           if [ -n "$RUN_IDS" ]; then
+            echo "发现待删除运行记录 ID: $RUN_IDS"
             echo "$RUN_IDS" | xargs -r -I % -n 1 gh run delete %
           else
-            echo "没有需要删除的运行记录"
+            echo "✅ 没有需要删除的运行记录"
           fi

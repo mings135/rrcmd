@@ -23,10 +23,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v2.6.1
+      #   with:
+      #     name: ${{ env.RELEASE_TAG }}
+      #     tag_name: ${{ env.RELEASE_TAG }}
+      #     body: "远程执行命令, 多主机并发"
+      #     token: ${{ secrets.MY_TOKEN }}
+
       - name: Create Release
-        uses: softprops/action-gh-release@v2.6.1
-        with:
-          name: ${{ env.RELEASE_TAG }}
-          tag_name: ${{ env.RELEASE_TAG }}
-          body: "远程执行命令, 多主机并发"
-          token: ${{ secrets.MY_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          echo "--- 正在处理 Release $RELEASE_TAG ---"
+          
+          # 检查 Release 是否已经存在
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release 已存在"
+          else
+            echo "创建新 Release..."
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes "远程执行命令, 多主机并发"
+          fi
