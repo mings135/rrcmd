@@ -84,7 +84,7 @@ jobs:
           echo "--- 正在清理旧的 Release 和 Tag ---"
           # 使用 --json 确保 Tag 100% 准确，保留最新的几个(排除 latest)
           RELEASES=$(gh release list --limit 100 --json tagName,isLatest \
-            | jq -r '.[] | select(.isLatest == false) | .tagName' \
+            --jq '.[] | select(.isLatest == false) | .tagName' \
             | tail -n +"$REL_SKIP") 
           
           if [ -n "$RELEASES" ]; then
@@ -97,7 +97,7 @@ jobs:
 
           echo "--- 正在清理旧的 Workflow 运行记录 ---"
           RUN_IDS=$(gh run list --limit 100 --status completed --json databaseId \
-            | jq -r '.[].databaseId' \
+            --jq '.[].databaseId' \
             | tail -n +"$RUN_SKIP")
           
           if [ -n "$RUN_IDS" ]; then
