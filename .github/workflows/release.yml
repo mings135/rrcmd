@@ -44,23 +44,15 @@ jobs:
             exit 1
           fi
 
-      # - name: Create Release
-      #   uses: softprops/action-gh-release@v2.6.1
-      #   with:
-      #     name: ${{ env.RELEASE_TAG }}
-      #     # tag_name: ${{ env.RELEASE_TAG }}
-      #     body: "远程执行命令, 多主机并发"
-      #     token: ${{ secrets.MY_TOKEN }}
-      #     files: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
-
       - name: Create or Update Release
         env:
           GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          RELEASE_TITLE: ${{ env.RELEASE_TAG }}
+          RELEASE_NOTES: "远程执行命令, 多主机并发"
           RELEASE_FILE: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
         run: |
-          echo "--- 正在处理 Release $RELEASE_TAG ---"
-          
+          echo "--- 正在处理 Release $RELEASE_TAG ---" 
           # 检查 Release 是否已经存在
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release 已存在，正在上传新文件..."
@@ -68,8 +60,8 @@ jobs:
           else
             echo "创建新 Release 并上传文件..."
             gh release create "$RELEASE_TAG" "$RELEASE_FILE" \
-              --title "$RELEASE_TAG" \
-              --notes "远程执行命令, 多主机并发"
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_NOTES"
           fi
 
   clean:
@@ -83,13 +75,17 @@ jobs:
       - name: Clean releases and workflows
         env:
           GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
-        shell: bash
+          KEEP_RELEASES: 3
+          KEEP_WORKFLOWS: 6
         run: |
+          REL_SKIP=$((KEEP_RELEASES + 1))
+          RUN_SKIP=$((KEEP_WORKFLOWS + 1))
+
           echo "--- 正在清理旧的 Release 和 Tag ---"
           # 使用 --json 确保 Tag 100% 准确，保留最新的几个(排除 latest)
           RELEASES=$(gh release list --limit 100 --json tagName,isLatest \
             | jq -r '.[] | select(.isLatest == false) | .tagName' \
-            | tail -n +3) 
+            | tail -n +"$REL_SKIP") 
           
           if [ -n "$RELEASES" ]; then
             echo "发现待删除 Release: $RELEASES"
@@ -99,10 +95,9 @@ jobs:
           fi
 
           echo "--- 正在清理旧的 Workflow 运行记录 ---"
-          # 使用 --json 提取 run ID
           RUN_IDS=$(gh run list --limit 100 --status completed --json databaseId \
             | jq -r '.[].databaseId' \
-            | tail -n +6)
+            | tail -n +"$RUN_SKIP")
           
           if [ -n "$RUN_IDS" ]; then
             echo "发现待删除运行记录 ID: $RUN_IDS"
