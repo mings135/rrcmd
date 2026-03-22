@@ -108,7 +108,7 @@ jobs:
         run: |
           echo "--- 正在清理旧的 Release 和 Tag ---"
           RELEASES=$(gh release list --limit 100 \
-            --json tagName,isLatest \
+            --exclude-drafts --json tagName,isLatest \
             --jq "[.[] | select(.isLatest == false)] | .[${KEEP_RELEASES}:].[] | .tagName")
           
           if [ -n "$RELEASES" ]; then
@@ -134,7 +134,7 @@ jobs:
 
           echo "--- 正在清理 Draft Release ---"
           DRAFTS=$(gh release list --limit 100 \
-            --exclude-drafts=false --json tagName,isDraft \
+            --json tagName,isDraft \
             --jq '[.[] | select(.isDraft == true)] | .[1:].[] | .tagName')
           
           if [ -n "$DRAFTS" ]; then
