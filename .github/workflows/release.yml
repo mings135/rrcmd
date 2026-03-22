@@ -100,7 +100,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Clean releases and workflows
+      - name: Clean Releases and Workflows
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KEEP_RELEASES: 3
