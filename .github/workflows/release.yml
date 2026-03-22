@@ -98,7 +98,7 @@ jobs:
 
       - name: Clean releases and workflows
         env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KEEP_RELEASES: 3
           KEEP_WORKFLOWS: 6
         run: |
