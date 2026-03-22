@@ -4,9 +4,6 @@
 name: Go Build and Release
 
 on:
-  push:
-    tags:
-      - v*
   workflow_dispatch:
     inputs:
       tag_name:
@@ -18,7 +15,7 @@ on:
 env:
   APP_NAME: rrcmd
   BUILD_DIR: build
-  RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
+  TAG_NAME: ${{ inputs.tag_name }}
 
 jobs:
   build:
@@ -52,8 +49,8 @@ jobs:
       - name: Create or Update Release
         env:
           GH_TOKEN: ${{ secrets.MY_TOKEN }}
-          RELEASE_TAG: ${{ env.RELEASE_TAG }}
-          RELEASE_TITLE: ${{ env.RELEASE_TAG }}
+          RELEASE_TAG: ${{ env.TAG_NAME }}
+          RELEASE_TITLE: ${{ env.TAG_NAME }}
           RELEASE_NOTES: "远程执行命令, 多主机并发"
           RELEASE_FILE: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
         run: |
@@ -81,7 +78,7 @@ jobs:
       - name: Publish Release
         env:
           GH_TOKEN: ${{ secrets.MY_TOKEN }}
-          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          RELEASE_TAG: ${{ env.TAG_NAME }}
         run: |
           gh release edit "$RELEASE_TAG" --draft=false
 
