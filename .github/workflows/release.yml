@@ -7,11 +7,18 @@ on:
   push:
     tags:
       - v*
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "The tag(version) you want to create"
+        required: true
+        type: string
+        default: "v0.1"
 
 env:
   APP_NAME: rrcmd
   BUILD_DIR: build
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
 
 jobs:
   build:
