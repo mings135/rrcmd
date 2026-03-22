@@ -34,6 +34,7 @@ jobs:
           else
             echo "创建新 Release..."
             gh release create "$RELEASE_TAG" \
+              --draft \
               --title "$RELEASE_TITLE" \
               --notes "$RELEASE_NOTES"
           fi
