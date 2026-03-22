@@ -22,7 +22,7 @@ jobs:
 
       - name: Create Release
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
           RELEASE_TAG: ${{ github.event.inputs.tag_name }}
           RELEASE_TITLE: ${{ github.event.inputs.tag_name }}
           RELEASE_NOTES: "远程执行命令, 多主机并发"

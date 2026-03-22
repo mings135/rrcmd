@@ -34,19 +34,19 @@ jobs:
 
       - name: Build
         run: |
-          mkdir -p ${{ env.BUILD_DIR }}
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+          mkdir -p $BUILD_DIR
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${BUILD_DIR}/${APP_NAME}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
 
       - name: Check
         run: |
-          if [ ! -f ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }} ]; then
+          if [ ! -f ${BUILD_DIR}/${APP_NAME}_${{ matrix.os }}_${{ matrix.arch }} ]; then
             echo "Build failed or output file not found!"
             exit 1
           fi
 
       - name: Create or Update Release
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           RELEASE_TITLE: ${{ env.RELEASE_TAG }}
           RELEASE_NOTES: "远程执行命令, 多主机并发"
@@ -74,7 +74,7 @@ jobs:
 
       - name: Clean releases and workflows
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
           KEEP_RELEASES: 3
           KEEP_WORKFLOWS: 6
         run: |
