@@ -106,13 +106,10 @@ jobs:
           KEEP_RELEASES: 3
           KEEP_WORKFLOWS: 6
         run: |
-          REL_SKIP=$((KEEP_RELEASES + 1))
-          RUN_SKIP=$((KEEP_WORKFLOWS + 1))
-
           echo "--- 正在清理旧的 Release 和 Tag ---"
-          RELEASES=$(gh release list --limit 100 --json tagName,isLatest \
-            --jq '.[] | select(.isLatest == false) | .tagName' \
-            | tail -n +"$REL_SKIP") 
+          RELEASES=$(gh release list --limit 100 \
+            --json tagName,isLatest \
+            --jq "[.[] | select(.isLatest == false)] | .[${KEEP_RELEASES}:].[] | .tagName")
           
           if [ -n "$RELEASES" ]; then
             echo "发现待删除 Release:
@@ -122,10 +119,10 @@ jobs:
             echo "✅ 没有需要删除的 Release"
           fi
 
-          echo "--- 正在清理旧的 Workflow 运行记录 ---"
-          RUN_IDS=$(gh run list --limit 100 --status completed --json databaseId \
-            --jq '.[].databaseId' \
-            | tail -n +"$RUN_SKIP")
+          echo "--- 正在清理旧的 Workflow 运行记录 ---"            
+          RUN_IDS=$(gh run list --limit 100 \
+            --status completed --json databaseId \
+            --jq ".[${KEEP_WORKFLOWS}:].[] | .databaseId")
           
           if [ -n "$RUN_IDS" ]; then
             echo "发现待删除运行记录 ID: 
@@ -133,4 +130,17 @@ jobs:
             echo "$RUN_IDS" | xargs -r -I % -n 1 gh run delete %
           else
             echo "✅ 没有需要删除的运行记录"
+          fi
+
+          echo "--- 正在清理 Draft Release ---"
+          DRAFTS=$(gh release list --limit 100 \
+            --exclude-drafts=false --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft == true)] | .[1:].[] | .tagName')
+          
+          if [ -n "$DRAFTS" ]; then
+            echo "发现待删除 Draft Release:
+          $DRAFTS"
+            echo "$DRAFTS" | xargs -r -I % -n 1 gh release delete % --yes
+          else
+            echo "✅ 没有需要删除的 Draft Release"
           fi
