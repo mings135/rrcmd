@@ -16,8 +16,6 @@ on:
         default: "v0.1"
 
 env:
-  APP_NAME: rrcmd
-  BUILD_DIR: build
   TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
 
 jobs:
@@ -32,6 +30,11 @@ jobs:
         os: [linux]
         arch: [amd64, arm64]
 
+    env:
+      BUILD_DIR: build
+      APP_NAME: rrcmd
+      BUILD_FILES: ""
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -42,11 +45,14 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Build and Check
+        env:
+          BUILD_FILES: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
         run: |
+          echo "BUILD_FILES=${BUILD_FILES}" >> $GITHUB_ENV
           mkdir -p $BUILD_DIR
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${BUILD_DIR}/${APP_NAME}_${{ matrix.os }}_${{ matrix.arch }} -v ./...
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ${BUILD_FILES} -v ./...
 
-          if [ ! -f ${BUILD_DIR}/${APP_NAME}_${{ matrix.os }}_${{ matrix.arch }} ]; then
+          if [ ! -f "$BUILD_FILES" ]; then
             echo "Build failed or output file not found!"
             exit 1
           fi
@@ -57,7 +63,7 @@ jobs:
           RELEASE_TAG: ${{ env.TAG_NAME }}
           RELEASE_TITLE: ${{ env.TAG_NAME }}
           RELEASE_NOTES: "远程执行命令, 多主机并发"
-          RELEASE_FILES: ${{ env.BUILD_DIR }}/${{ env.APP_NAME }}_${{ matrix.os }}_${{ matrix.arch }}
+          RELEASE_FILES: ${{ env.BUILD_FILES }}
         run: |
           echo "--- 正在处理 Release $RELEASE_TAG ---" 
           # 检查 Release 是否已经存在
