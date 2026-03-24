@@ -4,9 +4,9 @@
 name: Go Build and Release
 
 on:
-  # push:
-  #   tags:
-  #     - v*
+  push:
+    tags:
+      - v*
   workflow_dispatch:
     inputs:
       tag_name:
@@ -20,6 +20,9 @@ env:
 
 jobs:
   build:
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[release]'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
