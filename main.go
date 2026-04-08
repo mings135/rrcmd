@@ -50,7 +50,7 @@ func main() {
 	flag.StringVar(&cmd, "c", "echo ok", "Command to run on remote hosts")
 	flag.StringVar(&user, "u", "", "SSH login username")
 	flag.IntVar(&jobs, "j", 1, "Max concurrency for SSH executions")
-	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes", "Extra SSH arguments")
+	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes -o ConnectTimeout=5 -o ServerAliveInterval=20", "Extra SSH arguments")
 	flag.StringVar(&patStr, "p", `^\[.*\].* \[.*\]$`, "Regex filter for real-time line display")
 	flag.BoolVar(&quiet, "q", false, "Quiet mode: only print matched lines")
 	flag.Parse()
@@ -110,15 +110,23 @@ func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID i
 	args = append(args, fmt.Sprintf("%s@%s", user, host), command)
 	cmd := exec.Command(sshBin, args...)
 
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return execResult{host: host, err: err, exitCode: 1}
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return execResult{host: host, err: err, exitCode: 1}
+	}
 
-	var unmatched []string
 	if err := cmd.Start(); err != nil {
 		return execResult{host: host, err: err, exitCode: 1}
 	}
 
+	var unmatched []string
 	var wg sync.WaitGroup
+	var localMu sync.Mutex
+
 	process := func(reader *bufio.Reader) {
 		defer wg.Done()
 		for {
@@ -126,13 +134,15 @@ func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID i
 			if line != "" {
 				line = strings.TrimSuffix(line, "\n")
 				show := pat.MatchString(line)
-				mu.Lock()
 				if show {
+					mu.Lock()
 					fmt.Printf("%s: %s\n", colorize(colorID, host), line)
+					mu.Unlock()
 				} else {
+					localMu.Lock()
 					unmatched = append(unmatched, line)
+					localMu.Unlock()
 				}
-				mu.Unlock()
 			}
 			if err != nil {
 				break
@@ -145,9 +155,8 @@ func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID i
 	go process(bufio.NewReader(stderr))
 	wg.Wait()
 
-	err := cmd.Wait()
 	exitCode := 0
-	if err != nil {
+	if err = cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {

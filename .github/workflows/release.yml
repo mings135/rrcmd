@@ -29,7 +29,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.23.4]
+        go-version: [1.26.1]
         os: [linux]
         arch: [amd64, arm64]
 
@@ -65,7 +65,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ env.TAG_NAME }}
           RELEASE_TITLE: ${{ env.TAG_NAME }}
-          RELEASE_NOTES: "远程执行命令, 多主机并发"
+          RELEASE_NOTES: |
+            Run run commands
+            - It's not backward compatible.
           RELEASE_FILES: ${{ env.BUILD_FILES }}
         run: |
           echo "--- 正在处理 Release $RELEASE_TAG ---" 
