@@ -46,13 +46,16 @@ func main() {
 		sshArgs string
 		patStr  string
 		quiet   bool
+		failed  bool
 	)
+
 	flag.StringVar(&cmd, "c", "echo ok", "Command to run on remote hosts")
 	flag.StringVar(&user, "u", "", "SSH login username")
 	flag.IntVar(&jobs, "j", 1, "Max concurrency for SSH executions")
 	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes -o ConnectTimeout=5 -o ServerAliveInterval=20", "Extra SSH arguments")
-	flag.StringVar(&patStr, "p", `^\[.*\].* \[.*\]$`, "Regex filter for real-time line display")
+	flag.StringVar(&patStr, "p", `.*`, "Regex filter for real-time line display")
 	flag.BoolVar(&quiet, "q", false, "Quiet mode: only print matched lines")
+	flag.BoolVar(&failed, "f", false, "Print failed host IPs at the end of output")
 	flag.Parse()
 
 	hosts := flag.Args()
@@ -88,14 +91,21 @@ func main() {
 	wg.Wait()
 
 	var hasError bool
+	var sb strings.Builder
+	sb.Grow(len(hosts) * 128)
 	for _, res := range results {
 		if res.err != nil || res.exitCode != 0 {
 			hasError = true
 			fmt.Printf("%s[ERROR]%s Host: %s, %v\n", red, colorOff, res.host, res.err)
+			sb.WriteString(res.host)
+			sb.WriteString(" ")
 		}
 	}
 
 	if hasError {
+		if failed {
+			fmt.Println(strings.TrimSuffix(sb.String(), " "))
+		}
 		os.Exit(1)
 	}
 }
