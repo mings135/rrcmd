@@ -177,10 +177,15 @@ func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID i
 	if len(unmatched) > 0 && !quiet {
 		mu.Lock()
 		fmt.Printf(">>>>>>>>>>>>>>>> Unmatched output(%s):\n", colorize(colorID, host))
+		var lastLine string
 		for _, l := range unmatched {
 			fmt.Println(l)
+			lastLine = l
 		}
-		fmt.Println()
+		lastLine = strings.TrimSpace(lastLine)
+		if lastLine != "" {
+			fmt.Println()
+		}
 		mu.Unlock()
 	}
 
