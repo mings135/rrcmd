@@ -12,90 +12,86 @@ import (
 )
 
 const (
-	ColorOff  = "\033[0m"
-	Red       = "\033[31m"
-	Green     = "\033[32m"
-	Yellow    = "\033[33m"
-	Blue      = "\033[34m"
-	Purple    = "\033[35m"
-	Cyan      = "\033[36m"
-	HighLight = "\033[1m"
+	colorOff  = "\033[0m"
+	red       = "\033[31m"
+	green     = "\033[32m"
+	yellow    = "\033[33m"
+	blue      = "\033[34m"
+	purple    = "\033[35m"
+	cyan      = "\033[36m"
+	highlight = "\033[1m"
 )
 
-var colors = []string{Red, Green, Yellow, Blue, Purple, Cyan}
+var colorList = []string{red, green, yellow, blue, purple, cyan}
 
-// Colorize returns input with color code.
-func Colorize(colorID int, input string) string {
-	c := colors[colorID%len(colors)]
-	return fmt.Sprintf("%s%s%s", c, input, ColorOff)
+// colorize returns the input string wrapped with a color code.
+func colorize(colorID int, input string) string {
+	color := colorList[colorID%len(colorList)]
+	return fmt.Sprintf("%s%s%s", color, input, colorOff)
 }
 
-type Result struct {
-	Host      string
-	Err       error
-	ExitCode  int
-	Unmatched []string
+// execResult holds the SSH command execution result for a host.
+type execResult struct {
+	host      string
+	err       error
+	exitCode  int
+	unmatched []string
 }
 
 func main() {
-	// 参数解析
 	var (
-		cmdStr  string
+		cmd     string
 		user    string
 		jobs    int
 		sshArgs string
-		pattern string
+		patStr  string
 		quiet   bool
 	)
-	flag.StringVar(&cmdStr, "c", "echo ok", "Command to run")
-	flag.StringVar(&user, "u", "", "Username for ssh login")
-	flag.IntVar(&jobs, "j", 1, "Max concurrency for ssh execution")
-	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes", "Custom ssh arguments")
-	flag.StringVar(&pattern, "p", `^\[.*\].* \[.*\]$`, `Regex to match output lines to print real time`)
-	flag.BoolVar(&quiet, "q", false, "Quiet mode, only print matched lines")
+	flag.StringVar(&cmd, "c", "echo ok", "Command to run on remote hosts")
+	flag.StringVar(&user, "u", "", "SSH login username")
+	flag.IntVar(&jobs, "j", 1, "Max concurrency for SSH executions")
+	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes", "Extra SSH arguments")
+	flag.StringVar(&patStr, "p", `^\[.*\].* \[.*\]$`, "Regex filter for real-time line display")
+	flag.BoolVar(&quiet, "q", false, "Quiet mode: only print matched lines")
 	flag.Parse()
 
 	hosts := flag.Args()
-	if len(cmdStr) == 0 || len(user) == 0 || len(hosts) == 0 {
+	if len(cmd) == 0 || len(user) == 0 || len(hosts) == 0 {
 		fmt.Fprintf(os.Stderr, "Usage: %s -u <user> -c <command> [options] host1 host2 ...\n", os.Args[0])
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	pat, err := regexp.Compile(pattern)
+	pat, err := regexp.Compile(patStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
 		os.Exit(1)
 	}
 
-	sem := make(chan struct{}, jobs) // 信号量，控制并发数量
+	sem := make(chan struct{}, jobs)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	results := make([]Result, len(hosts))
+	results := make([]execResult, len(hosts))
 
-	fmt.Printf("%s%sCommand%s: %s\n", Blue, HighLight, ColorOff, cmdStr)
-	fmt.Printf("%s%sHosts%s: %v\n", Blue, HighLight, ColorOff, hosts)
+	fmt.Printf("%s%sCommand%s: [%s]\n", blue, highlight, colorOff, cmd)
+	fmt.Printf("%s%sHosts%s: %v\n", blue, highlight, colorOff, hosts)
 
 	for idx, host := range hosts {
 		wg.Add(1)
 		go func(i int, h string, colorID int) {
 			defer wg.Done()
 			sem <- struct{}{}
-			res := runForHost(user, h, cmdStr, sshArgs, pat, colorID, quiet, &mu)
-			results[i] = res
+			results[i] = execHost(user, h, cmd, sshArgs, pat, colorID, quiet, &mu)
 			<-sem
 		}(idx, host, idx)
 	}
-
 	wg.Wait()
 
-	// 汇报错误
 	var hasError bool
 	for _, res := range results {
-		if res.Err != nil || res.ExitCode != 0 {
+		if res.err != nil || res.exitCode != 0 {
 			hasError = true
-			fmt.Printf("%s[ERROR]%s Host: %s, %v\n",
-				Red, ColorOff, res.Host, res.Err)
+			fmt.Printf("%s[ERROR]%s Host: %s, %v\n", red, colorOff, res.host, res.err)
 		}
 	}
 
@@ -104,36 +100,35 @@ func main() {
 	}
 }
 
-func runForHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID int, quiet bool, mu *sync.Mutex) Result {
-	// 构造 ssh 命令
+// execHost executes the given command over SSH for a single host.
+func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID int, quiet bool, mu *sync.Mutex) execResult {
 	sshBin := "ssh"
-	sshFields := []string{}
+	args := []string{}
 	if sshArgs != "" {
-		sshFields = strings.Fields(sshArgs)
+		args = strings.Fields(sshArgs)
 	}
-	sshFields = append(sshFields, fmt.Sprintf("%s@%s", user, host), command)
-	cmd := exec.Command(sshBin, sshFields...)
+	args = append(args, fmt.Sprintf("%s@%s", user, host), command)
+	cmd := exec.Command(sshBin, args...)
 
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 
 	var unmatched []string
-	startErr := cmd.Start()
-	if startErr != nil {
-		return Result{Host: host, Err: fmt.Errorf("Start failed: %v", startErr), ExitCode: 1}
+	if err := cmd.Start(); err != nil {
+		return execResult{host: host, err: err, exitCode: 1}
 	}
 
-	// 实时分流输出
 	var wg sync.WaitGroup
 	process := func(reader *bufio.Reader) {
 		defer wg.Done()
 		for {
 			line, err := reader.ReadString('\n')
 			if line != "" {
-				show := pat.MatchString(strings.TrimRight(line, "\n"))
+				line = strings.TrimSuffix(line, "\n")
+				show := pat.MatchString(line)
 				mu.Lock()
 				if show {
-					fmt.Printf("%s: %s", Colorize(colorID, host), line)
+					fmt.Printf("%s: %s\n", colorize(colorID, host), line)
 				} else {
 					unmatched = append(unmatched, line)
 				}
@@ -153,29 +148,27 @@ func runForHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID
 	err := cmd.Wait()
 	exitCode := 0
 	if err != nil {
-		// 获取退出码
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			exitCode = exiterr.ExitCode()
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
 		} else {
 			exitCode = 1
 		}
 	}
 
-	mu.Lock()
 	if len(unmatched) > 0 && !quiet {
-		fmt.Printf(">>>>>>>>>>>>>>>> %s Unmatched output:\n", Colorize(colorID, host))
+		mu.Lock()
+		fmt.Printf(">>>>>>>>>>>>>>>> Unmatched output(%s):\n", colorize(colorID, host))
 		for _, l := range unmatched {
-			fmt.Print(l)
+			fmt.Println(l)
 		}
 		fmt.Println()
+		mu.Unlock()
 	}
 
-	mu.Unlock()
-
-	return Result{
-		Host:      host,
-		Err:       err,
-		ExitCode:  exitCode,
-		Unmatched: unmatched,
+	return execResult{
+		host:      host,
+		err:       err,
+		exitCode:  exitCode,
+		unmatched: unmatched,
 	}
 }
