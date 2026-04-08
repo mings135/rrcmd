@@ -2,158 +2,180 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"sync"
 )
 
-// Color constants
 const (
+	ColorOff  = "\033[0m"
 	Red       = "\033[31m"
 	Green     = "\033[32m"
 	Yellow    = "\033[33m"
 	Blue      = "\033[34m"
 	Purple    = "\033[35m"
 	Cyan      = "\033[36m"
-	ColorOff  = "\033[0m"
 	HighLight = "\033[1m"
 )
 
-// Colorize function to return colored string
+var colors = []string{Red, Green, Yellow, Blue, Purple, Cyan}
+
+// Colorize returns input with color code.
 func Colorize(colorID int, input string) string {
-	var color string
-	switch colorID {
-	case 1:
-		color = Red
-	case 2:
-		color = Green
-	case 3:
-		color = Yellow
-	case 4:
-		color = Blue
-	case 5:
-		color = Purple
-	case 6:
-		color = Cyan
-	default:
-		return input
-	}
-	return color + input + ColorOff
+	c := colors[colorID%len(colors)]
+	return fmt.Sprintf("%s%s%s", c, input, ColorOff)
 }
 
-// RunCommand struct to hold command information
-type RunCommand struct {
-	username string
-	host     string
-	command  string
-	lock     *sync.Mutex
-	color    int
-	result   int
-}
-
-// Run executes the command and prints the output
-func (rc *RunCommand) Run(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	// Execute the command
-	cmd := exec.Command("ssh", fmt.Sprintf("%s@%s", rc.username, rc.host), rc.command)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		// fmt.Printf("Error getting stdout pipe: %v\n", err)
-		rc.result = 1
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		// fmt.Printf("Error getting stderr pipe: %v\n", err)
-		rc.result = 1
-		return
-	}
-	if err := cmd.Start(); err != nil {
-		// fmt.Printf("Error starting command: %v\n", err)
-		rc.result = 1
-		return
-	}
-
-	// Read and print the command stdout
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			rc.lock.Lock()
-			fmt.Printf("%v: %v\n", Colorize(rc.color, rc.host), scanner.Text())
-			rc.lock.Unlock()
-		}
-		if err := scanner.Err(); err != nil {
-			// fmt.Printf("Error reading stdout: %v\n", err)
-			rc.result = 1
-			return
-		}
-	}()
-
-	// Read and print the command stderr
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			rc.lock.Lock()
-			fmt.Printf("%v: %v\n", Colorize(rc.color, rc.host), scanner.Text())
-			rc.lock.Unlock()
-		}
-		if err := scanner.Err(); err != nil {
-			// fmt.Printf("Error reading stderr: %v\n", err)
-			rc.result = 1
-			return
-		}
-	}()
-
-	// Wait for the command to finish
-	if err := cmd.Wait(); err != nil {
-		// fmt.Printf("Error waiting for command: %v\n", err)
-		rc.result = 1
-		return
-	}
-
-	rc.result = 0
+type Result struct {
+	Host      string
+	Err       error
+	ExitCode  int
+	Unmatched []string
 }
 
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: <username> <command> <host> ...")
+	// 参数解析
+	var (
+		cmdStr  string
+		user    string
+		jobs    int
+		sshArgs string
+		pattern string
+		quiet   bool
+	)
+	flag.StringVar(&cmdStr, "c", "echo ok", "Command to run")
+	flag.StringVar(&user, "u", "", "Username for ssh login")
+	flag.IntVar(&jobs, "j", 1, "Max concurrency for ssh execution")
+	flag.StringVar(&sshArgs, "a", "-o BatchMode=yes", "Custom ssh arguments")
+	flag.StringVar(&pattern, "p", `^\[.*\].* \[.*\]$`, `Regex to match output lines to print real time`)
+	flag.BoolVar(&quiet, "q", false, "Quiet mode, only print matched lines")
+	flag.Parse()
+
+	hosts := flag.Args()
+	if len(cmdStr) == 0 || len(user) == 0 || len(hosts) == 0 {
+		fmt.Fprintf(os.Stderr, "Usage: %s -u <user> -c <command> [options] host1 host2 ...\n", os.Args[0])
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	username := os.Args[1]
-	command := os.Args[2]
-	hosts := os.Args[3:]
-	fmt.Printf("%v%vRun command%v: %v\n", Blue, HighLight, ColorOff, command)
-	fmt.Printf("%v%vRemote host%v: %v\n", Blue, HighLight, ColorOff, hosts)
+	pat, err := regexp.Compile(pattern)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
+		os.Exit(1)
+	}
 
+	sem := make(chan struct{}, jobs) // 信号量，控制并发数量
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var resultSum int
-	var color int
-	rcs := make([]*RunCommand, 0, len(hosts))
+	results := make([]Result, len(hosts))
 
-	for key, host := range hosts {
-		color = key % 7
-		rc := &RunCommand{
-			username: username,
-			host:     host,
-			command:  command,
-			lock:     &mu,
-			color:    color,
-		}
-		rcs = append(rcs, rc)
+	fmt.Printf("%s%sCommand%s: %s\n", Blue, HighLight, ColorOff, cmdStr)
+	fmt.Printf("%s%sHosts%s: %v\n", Blue, HighLight, ColorOff, hosts)
+
+	for idx, host := range hosts {
 		wg.Add(1)
-		go rc.Run(&wg)
+		go func(i int, h string, colorID int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			res := runForHost(user, h, cmdStr, sshArgs, pat, colorID, quiet, &mu)
+			results[i] = res
+			<-sem
+		}(idx, host, idx)
 	}
 
 	wg.Wait()
-	for _, rc := range rcs {
-		resultSum += rc.result
+
+	// 汇报错误
+	var hasError bool
+	for _, res := range results {
+		if res.Err != nil || res.ExitCode != 0 {
+			hasError = true
+			fmt.Printf("%s[ERROR]%s Host: %s, %v\n",
+				Red, ColorOff, res.Host, res.Err)
+		}
 	}
 
-	if resultSum > 0 {
+	if hasError {
 		os.Exit(1)
+	}
+}
+
+func runForHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID int, quiet bool, mu *sync.Mutex) Result {
+	// 构造 ssh 命令
+	sshBin := "ssh"
+	sshFields := []string{}
+	if sshArgs != "" {
+		sshFields = strings.Fields(sshArgs)
+	}
+	sshFields = append(sshFields, fmt.Sprintf("%s@%s", user, host), command)
+	cmd := exec.Command(sshBin, sshFields...)
+
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+
+	var unmatched []string
+	startErr := cmd.Start()
+	if startErr != nil {
+		return Result{Host: host, Err: fmt.Errorf("Start failed: %v", startErr), ExitCode: 1}
+	}
+
+	// 实时分流输出
+	var wg sync.WaitGroup
+	process := func(reader *bufio.Reader) {
+		defer wg.Done()
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				show := pat.MatchString(strings.TrimRight(line, "\n"))
+				mu.Lock()
+				if show {
+					fmt.Printf("%s: %s", Colorize(colorID, host), line)
+				} else {
+					unmatched = append(unmatched, line)
+				}
+				mu.Unlock()
+			}
+			if err != nil {
+				break
+			}
+		}
+	}
+
+	wg.Add(2)
+	go process(bufio.NewReader(stdout))
+	go process(bufio.NewReader(stderr))
+	wg.Wait()
+
+	err := cmd.Wait()
+	exitCode := 0
+	if err != nil {
+		// 获取退出码
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			exitCode = exiterr.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+
+	mu.Lock()
+	if len(unmatched) > 0 && !quiet {
+		fmt.Printf(">>>>>>>>>>>>>>>> %s Unmatched output:\n", Colorize(colorID, host))
+		for _, l := range unmatched {
+			fmt.Print(l)
+		}
+		fmt.Println()
+	}
+
+	mu.Unlock()
+
+	return Result{
+		Host:      host,
+		Err:       err,
+		ExitCode:  exitCode,
+		Unmatched: unmatched,
 	}
 }
