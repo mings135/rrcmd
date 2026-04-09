@@ -76,8 +76,8 @@ func main() {
 	var mu sync.Mutex
 	results := make([]execResult, len(hosts))
 
-	fmt.Printf("%s%s[Command]%s: %s\n", blue, highlight, colorOff, cmd)
-	fmt.Printf("%s%s[Hosts]%s: %s\n", blue, highlight, colorOff, strings.Join(hosts, " "))
+	fmt.Printf("%s%s[Running] hosts%s: %s\n", blue, highlight, colorOff, strings.Join(hosts, " "))
+	fmt.Printf("%s%s[Running] command%s: %s\n", blue, highlight, colorOff, cmd)
 
 	for idx, host := range hosts {
 		wg.Add(1)
