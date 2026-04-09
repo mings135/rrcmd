@@ -76,8 +76,8 @@ func main() {
 	var mu sync.Mutex
 	results := make([]execResult, len(hosts))
 
-	fmt.Printf("%s%sCommand%s: [%s]\n", blue, highlight, colorOff, cmd)
-	fmt.Printf("%s%sHosts%s: %v\n", blue, highlight, colorOff, hosts)
+	fmt.Printf("%s%s[Command]%s: %s\n", blue, highlight, colorOff, cmd)
+	fmt.Printf("%s%s[Hosts]%s: %s\n", blue, highlight, colorOff, strings.Join(hosts, " "))
 
 	for idx, host := range hosts {
 		wg.Add(1)
@@ -176,7 +176,7 @@ func execHost(user, host, command, sshArgs string, pat *regexp.Regexp, colorID i
 
 	if len(unmatched) > 0 && !quiet {
 		mu.Lock()
-		fmt.Printf(">>>>>>>>>>>>>>>> Unmatched output(%s):\n", colorize(colorID, host))
+		fmt.Printf(">>>>>>>>>>>>>>>> [Output] unmatched(%s):\n", colorize(colorID, host))
 		var lastLine string
 		for _, l := range unmatched {
 			fmt.Println(l)
